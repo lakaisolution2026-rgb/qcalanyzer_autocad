@@ -1,26 +1,31 @@
 using System;
 using System.Collections.Generic;
 
-namespace QCValidator.Domain.Models;
-
-public class QCReport
+namespace QCValidator.Domain.Models
 {
-    public string FileName { get; set; } = string.Empty;
-    public DateTime RunDate { get; set; }
-    public List<QCError> Errors { get; set; } = new List<QCError>();
-
-    public QCReport() { }
-
-    public QCReport(string fileName, DateTime runDate)
+    public class QCReport
     {
-        FileName = fileName;
-        RunDate = runDate;
-    }
+        public string FileName { get; set; } = string.Empty;
+        public DateTime RunDate { get; set; }
+        public string Summary { get; set; } = string.Empty;
+        public List<QCError> Errors { get; set; } = new List<QCError>();
+        public List<Layer> Layers { get; set; } = new List<Layer>();
 
-    public QCReport(string fileName, DateTime runDate, List<QCError> errors)
-    {
-        FileName = fileName;
-        RunDate = runDate;
-        Errors = errors;
+        public QCReport() { }
+
+        public QCReport(string fileName, DateTime runDate)
+        {
+            FileName = fileName;
+            RunDate = runDate;
+        }
+
+        public QCReport(string fileName, DateTime runDate, string summary, List<QCError> errors, List<Layer> layers = null)
+        {
+            FileName = fileName;
+            RunDate = runDate;
+            Summary = summary;
+            Errors = errors;
+            Layers = layers ?? new List<Layer>();
+        }
     }
 }

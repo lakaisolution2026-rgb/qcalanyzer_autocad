@@ -1,10 +1,12 @@
 using QCValidator.Domain.Models;
 using System.Collections.Generic;
 
-namespace QCValidator.Application.Interfaces;
-
-public interface IDrawingDataProvider
+namespace QCValidator.Application.Interfaces
 {
-    List<Layer> GetLayers();
-    List<TextStyle> GetTextStyles();
+    public interface IDrawingDataProvider
+    {
+        List<Layer> GetLayers();
+        List<TextStyle> GetTextStyles();
+        List<DrawingEntity> GetEntities();
+    }
 }

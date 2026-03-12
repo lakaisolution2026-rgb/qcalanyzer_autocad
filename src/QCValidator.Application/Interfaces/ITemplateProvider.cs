@@ -1,10 +1,11 @@
 using QCValidator.Domain.Models;
 using System.Collections.Generic;
 
-namespace QCValidator.Application.Interfaces;
-
-public interface ITemplateProvider
+namespace QCValidator.Application.Interfaces
 {
-    List<Layer> GetTemplateLayers();
-    List<TextStyle> GetTemplateTextStyles();
+    public interface ITemplateProvider
+    {
+        List<Layer> GetTemplateLayers();
+        List<TextStyle> GetTemplateTextStyles();
+    }
 }

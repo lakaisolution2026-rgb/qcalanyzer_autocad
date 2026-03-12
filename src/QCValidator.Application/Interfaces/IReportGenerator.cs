@@ -1,8 +1,9 @@
 using QCValidator.Domain.Models;
 
-namespace QCValidator.Application.Interfaces;
-
-public interface IReportGenerator
+namespace QCValidator.Application.Interfaces
 {
-    void Generate(QCReport report);
+    public interface IReportGenerator
+    {
+        void Generate(QCReport report);
+    }
 }

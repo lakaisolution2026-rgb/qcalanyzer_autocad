@@ -1,19 +1,20 @@
-namespace QCValidator.Domain.Models;
-
-public class TextStyle
+namespace QCValidator.Domain.Models
 {
-    public string Name { get; set; } = string.Empty;
-    public string Font { get; set; } = string.Empty;
-    public double Height { get; set; }
-    public bool IsAnnotative { get; set; }
-
-    public TextStyle() { }
-
-    public TextStyle(string name, string font, double height, bool isAnnotative = false)
+    public class TextStyle
     {
-        Name = name;
-        Font = font;
-        Height = height;
-        IsAnnotative = isAnnotative;
+        public string Name { get; set; } = string.Empty;
+        public string Font { get; set; } = string.Empty;
+        public double Height { get; set; }
+        public bool IsAnnotative { get; set; }
+
+        public TextStyle() { }
+
+        public TextStyle(string name, string font, double height, bool isAnnotative = false)
+        {
+            Name = name;
+            Font = font;
+            Height = height;
+            IsAnnotative = isAnnotative;
+        }
     }
 }

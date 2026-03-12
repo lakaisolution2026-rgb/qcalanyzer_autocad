@@ -2,24 +2,35 @@ using QCValidator.Application.Interfaces;
 using QCValidator.Domain.Models;
 using System.Collections.Generic;
 
-namespace QCValidator.Infrastructure.Providers;
-
-public class MockDrawingProvider : IDrawingDataProvider
+namespace QCValidator.Infrastructure.Providers
 {
-    public List<Layer> GetLayers()
+    public class MockDrawingProvider : IDrawingDataProvider
     {
-        return new List<Layer>
+        public List<Layer> GetLayers()
         {
-            new Layer("RRU_L", 7),
-            new Layer("ANT_L", 3)
-        };
-    }
+            return new List<Layer>
+            {
+                new Layer("RRU_L", 7),
+                new Layer("ANT_L", 3)
+            };
+        }
 
-    public List<TextStyle> GetTextStyles()
-    {
-        return new List<TextStyle>
+        public List<TextStyle> GetTextStyles()
         {
-            new TextStyle("ROMANS", "romans.shx", 0.0)
-        };
+            return new List<TextStyle>
+            {
+                new TextStyle("ROMANS", "romans.shx", 0.0)
+            };
+        }
+
+        public List<DrawingEntity> GetEntities()
+        {
+            return new List<DrawingEntity>
+            {
+                new DrawingEntity { LayerName = "0", EntityType = "Line" },
+                new DrawingEntity { LayerName = "RRU_L", EntityType = "Circle" },
+                new DrawingEntity { LayerName = "0", EntityType = "Text" }
+            };
+        }
     }
 }

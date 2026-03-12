@@ -1,17 +1,20 @@
-namespace QCValidator.Domain.Models;
-
-public class QCError
+namespace QCValidator.Domain.Models
 {
-    public string Category { get; set; } = string.Empty;
-    public string Item { get; set; } = string.Empty;
-    public string Message { get; set; } = string.Empty;
-
-    public QCError() { }
-
-    public QCError(string category, string item, string message)
+    public class QCError
     {
-        Category = category;
-        Item = item;
-        Message = message;
+        public string Category { get; set; } = string.Empty;
+        public string Item { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string Severity { get; set; } = "Error";
+
+        public QCError() { }
+
+        public QCError(string category, string item, string message, string severity = "Error")
+        {
+            Category = category;
+            Item = item;
+            Message = message;
+            Severity = severity;
+        }
     }
 }
