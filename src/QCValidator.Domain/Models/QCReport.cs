@@ -9,7 +9,6 @@ namespace QCValidator.Domain.Models
         public DateTime RunDate { get; set; }
         public string Summary { get; set; } = string.Empty;
         public List<QCError> Errors { get; set; } = new List<QCError>();
-        public List<Layer> Layers { get; set; } = new List<Layer>();
 
         public QCReport() { }
 
@@ -19,13 +18,12 @@ namespace QCValidator.Domain.Models
             RunDate = runDate;
         }
 
-        public QCReport(string fileName, DateTime runDate, string summary, List<QCError> errors, List<Layer> layers = null)
+        public QCReport(string fileName, DateTime runDate, string summary, List<QCError> errors)
         {
             FileName = fileName;
             RunDate = runDate;
             Summary = summary;
             Errors = errors;
-            Layers = layers ?? new List<Layer>();
         }
     }
 }

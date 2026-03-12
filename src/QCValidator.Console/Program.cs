@@ -34,10 +34,10 @@ try
         reportGenerator);
 
     // 4. Run Validation
-    validationService.Run(targetFile);
+    string reportPath = validationService.Run(targetFile);
     
     Console.WriteLine("Processing Completed.");
-    Console.WriteLine("Report generated: qc_report.json");
+    Console.WriteLine($"Report generated: {reportPath}");
 }
 catch (Exception ex)
 {

@@ -12,7 +12,7 @@ namespace QCValidator.Infrastructure.Providers
     public class AutoCadDrawingProvider : IDrawingDataProvider
     {
         private readonly string _filePath;
-        private CadDocument _document;
+        private CadDocument? _document;
 
         public AutoCadDrawingProvider(string filePath)
         {

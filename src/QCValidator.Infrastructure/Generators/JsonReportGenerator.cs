@@ -1,3 +1,4 @@
+using System;
 using QCValidator.Application.Interfaces;
 using QCValidator.Domain.Models;
 using System.IO;
@@ -7,9 +8,7 @@ namespace QCValidator.Infrastructure.Generators
 {
     public class JsonReportGenerator : IReportGenerator
     {
-        private const string ReportFileName = "qc_report.json";
-
-        public void Generate(QCReport report)
+        public string Generate(QCReport report)
         {
             var options = new JsonSerializerOptions
             {
@@ -18,8 +17,11 @@ namespace QCValidator.Infrastructure.Generators
 
             string jsonContent = JsonSerializer.Serialize(report, options);
             
-            // Save file in the same directory as the application
-            File.WriteAllText(ReportFileName, jsonContent);
+            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string fileName = $"qc_report_{timestamp}.json";
+            
+            File.WriteAllText(fileName, jsonContent);
+            return fileName;
         }
     }
 }

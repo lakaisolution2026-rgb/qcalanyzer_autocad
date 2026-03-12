@@ -10,10 +10,7 @@ namespace QCValidator.Infrastructure.Providers
         {
             return new List<Layer>
             {
-                new Layer("RRU_L", 7),
-             
-                new Layer("CABLE_L", 4) // This will trigger a missing layer error in our mock setup
-            };
+             };
         }
 
         public List<TextStyle> GetTemplateTextStyles()

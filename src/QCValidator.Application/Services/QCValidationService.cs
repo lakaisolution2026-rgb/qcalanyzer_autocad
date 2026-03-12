@@ -22,7 +22,7 @@ namespace QCValidator.Application.Services
             _reportGenerator = reportGenerator;
         }
 
-        public void Run(string fileName)
+        public string Run(string fileName)
         {
             var errors = new List<QCError>();
 
@@ -103,11 +103,11 @@ namespace QCValidator.Application.Services
                 ? "All text styles are compliant." 
                 : "Non-compliant text styles found.";
 
-            // 4. Create Report (including the raw layers found)
-            var report = new QCReport(fileName, DateTime.Now, summary, errors, currentLayers);
+            // 4. Create Report
+            var report = new QCReport(fileName, DateTime.Now, summary, errors);
 
             // 4. Generate Output
-            _reportGenerator.Generate(report);
+            return _reportGenerator.Generate(report);
         }
     }
 }

@@ -4,6 +4,6 @@ namespace QCValidator.Application.Interfaces
 {
     public interface IReportGenerator
     {
-        void Generate(QCReport report);
+        string Generate(QCReport report);
     }
 }
