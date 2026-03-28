@@ -63,12 +63,65 @@ namespace QCValidator.Infrastructure.Providers
         {
             if (_document == null) return new List<Domain.Models.DrawingEntity>();
 
-            // ACadSharp Entities collection contains all entities in the drawing
-            return _document.Entities.Select(e => new Domain.Models.DrawingEntity
+            var drawingEntities = new List<Domain.Models.DrawingEntity>();
+
+            foreach (var e in _document.Entities)
             {
-                LayerName = e.Layer.Name,
-                EntityType = e.ObjectName // e.g. "AcDbLine", "AcDbCircle"
-            }).ToList();
+                var drawingEntity = new Domain.Models.DrawingEntity
+                {
+                    LayerName = e.Layer.Name,
+                    EntityType = e.ObjectName,
+                    Space = (e.Owner as ACadSharp.Tables.BlockRecord)?.Name ?? "Unknown"
+                };
+
+                // Extract location based on entity type
+                if (e is ACadSharp.Entities.TextEntity text)
+                {
+                    drawingEntity.X = text.InsertPoint.X;
+                    drawingEntity.Y = text.InsertPoint.Y;
+                    drawingEntity.StyleName = text.Style?.Name ?? "Standard";
+                }
+                else if (e is ACadSharp.Entities.MText mtext)
+                {
+                    drawingEntity.X = mtext.InsertPoint.X;
+                    drawingEntity.Y = mtext.InsertPoint.Y;
+                    drawingEntity.StyleName = mtext.Style?.Name ?? "Standard";
+                }
+                else if (e is ACadSharp.Entities.Line line)
+                {
+                    drawingEntity.X = line.StartPoint.X;
+                    drawingEntity.Y = line.StartPoint.Y;
+                }
+                else if (e is ACadSharp.Entities.Circle circle)
+                {
+                    drawingEntity.X = circle.Center.X;
+                    drawingEntity.Y = circle.Center.Y;
+                }
+                else if (e is ACadSharp.Entities.Point point)
+                {
+                    drawingEntity.X = point.Location.X;
+                    drawingEntity.Y = point.Location.Y;
+                }
+                else if (e is ACadSharp.Entities.Arc arc)
+                {
+                    drawingEntity.X = arc.Center.X;
+                    drawingEntity.Y = arc.Center.Y;
+                }
+                else if (e is ACadSharp.Entities.LwPolyline polyline && polyline.Vertices.Any())
+                {
+                    drawingEntity.X = polyline.Vertices.First().Location.X;
+                    drawingEntity.Y = polyline.Vertices.First().Location.Y;
+                }
+                else if (e is ACadSharp.Entities.Insert insert)
+                {
+                    drawingEntity.X = insert.InsertPoint.X;
+                    drawingEntity.Y = insert.InsertPoint.Y;
+                }
+
+                drawingEntities.Add(drawingEntity);
+            }
+
+            return drawingEntities;
         }
     }
 }

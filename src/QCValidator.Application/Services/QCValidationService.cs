@@ -59,28 +59,13 @@ namespace QCValidator.Application.Services
             var allowedTextStyles = _templateProvider.GetTemplateTextStyles();
             bool textStylesClean = true;
 
-            foreach (var currentStyle in currentTextStyles)
-            {
-                bool isAllowed = allowedTextStyles.Any(a => 
-                    a.Name.Equals(currentStyle.Name, StringComparison.OrdinalIgnoreCase));
-
-                if (!isAllowed)
-                {
-                    textStylesClean = false;
-                    errors.Add(new QCError(
-                        "Text Style Rule",
-                        currentStyle.Name,
-                        $"Text style '{currentStyle.Name}' (Font: {currentStyle.Font}) is not allowed. Only Arial, Arial Narrow, and Standard are permitted.",
-                        "Error"
-                    ));
-                }
-            }
 
             // 3. Check for entities on Layer 0
             var entities = _drawingProvider.GetEntities();
             bool layer0Found = false;
             foreach (var entity in entities)
             {
+                // Layer 0 Check
                 if (entity.LayerName == "0")
                 {
                     layer0Found = true;
@@ -88,8 +73,37 @@ namespace QCValidator.Application.Services
                         "Layer Rule",
                         "Layer 0",
                         $"Entity of type '{entity.EntityType}' exists on Layer 0.",
-                        "Warning"
+                        "Warning",
+                        entity.X,
+                        entity.Y,
+                        entity.Space
                     ));
+                }
+
+                // Text Style Usage Check (Providing location)
+                bool isText = entity.EntityType.Equals("TEXT", StringComparison.OrdinalIgnoreCase) || 
+                              entity.EntityType.Equals("MTEXT", StringComparison.OrdinalIgnoreCase) ||
+                              entity.EntityType.Equals("AcDbText", StringComparison.OrdinalIgnoreCase) ||
+                              entity.EntityType.Equals("AcDbMText", StringComparison.OrdinalIgnoreCase);
+
+                if (isText && !string.IsNullOrEmpty(entity.StyleName))
+                {
+                    bool isStyleAllowed = allowedTextStyles.Any(a => 
+                        a.Name.Equals(entity.StyleName, StringComparison.OrdinalIgnoreCase));
+
+                    if (!isStyleAllowed)
+                    {
+                        textStylesClean = false;
+                        errors.Add(new QCError(
+                            "Text Style Usage",
+                            entity.StyleName,
+                            $"Text entity uses non-compliant style '{entity.StyleName}'.",
+                            "Error",
+                            entity.X,
+                            entity.Y,
+                            entity.Space
+                        ));
+                    }
                 }
             }
 
