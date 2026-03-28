@@ -90,25 +90,15 @@ namespace QCValidator.Application.Services
                     "Error"
                 );
 
-                if (styleUsages.Any())
+                // Only flag styles that are actually used by entities.
+                // Skip orphaned styles that exist in the style table but aren't applied anywhere.
+                if (!styleUsages.Any()) continue;
+
+                foreach (var e in styleUsages)
                 {
-                    foreach (var e in styleUsages)
-                    {
-                        bool hasContent = !string.IsNullOrWhiteSpace(e.Value);
-                        string displayVal = hasContent ? e.Value : $"[{e.EntityType} – empty]";
-                        err.AddLocation(e.X, e.Y, e.Space, displayVal, e.StyleName);
-                    }
-                }
-                else
-                {
-                    // Style is in the table but no located entity – report without coordinates
-                    err.Locations.Add(new QCLocation
-                    {
-                        X = 0, Y = 0,
-                        Space = "Unknown (style defined in Style Table)",
-                        TextContent = "[No specific location found – style exists in drawing style table]",
-                        FoundStyle = style.Name
-                    });
+                    bool hasContent = !string.IsNullOrWhiteSpace(e.Value);
+                    string displayVal = hasContent ? e.Value : $"[{e.EntityType} – empty]";
+                    err.AddLocation(e.X, e.Y, e.Space, displayVal, e.StyleName);
                 }
 
                 consolidatedErrors[key] = err;

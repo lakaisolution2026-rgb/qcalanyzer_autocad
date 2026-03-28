@@ -122,6 +122,9 @@ namespace QCValidator.Infrastructure.Providers
                     // Check attributes inside the block for text styles
                     foreach(var attr in insert.Attributes)
                     {
+                        // Skip empty attribute placeholders
+                        if (string.IsNullOrWhiteSpace(attr.Value)) continue;
+
                         drawingEntities.Add(new Domain.Models.DrawingEntity
                         {
                             LayerName = attr.Layer.Name,
@@ -136,6 +139,102 @@ namespace QCValidator.Infrastructure.Providers
                 }
 
                 drawingEntities.Add(drawingEntity);
+            }
+
+            // ─────────────────────────────────────────────────────────
+            // Paper Space scanning – find all *Paper_Space block records
+            // and extract entities exactly the same way as Model Space.
+            // ─────────────────────────────────────────────────────────
+            foreach (var blockRecord in _document.BlockRecords)
+            {
+                if (!blockRecord.Name.StartsWith("*Paper_Space", System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                // Build a friendly space label
+                string spaceName = blockRecord.Name.Equals("*Paper_Space", System.StringComparison.OrdinalIgnoreCase)
+                    ? "PaperSpace"
+                    : $"PaperSpace ({blockRecord.Name.Replace("*Paper_Space", "Layout")})";
+
+                foreach (var e in blockRecord.Entities)
+                {
+                    // Skip Viewport entities – every Paper Space layout has a
+                    // system-generated default viewport on Layer 0. These are
+                    // not user errors and should not be flagged.
+                    if (e is ACadSharp.Entities.Viewport)
+                        continue;
+
+                    var drawingEntity = new Domain.Models.DrawingEntity
+                    {
+                        LayerName = e.Layer?.Name ?? "0",
+                        EntityType = e.ObjectName,
+                        Space = spaceName
+                    };
+
+                    if (e is ACadSharp.Entities.TextEntity psText)
+                    {
+                        drawingEntity.X = psText.InsertPoint.X;
+                        drawingEntity.Y = psText.InsertPoint.Y;
+                        drawingEntity.StyleName = psText.Style?.Name ?? "Standard";
+                        drawingEntity.Value = psText.Value;
+                    }
+                    else if (e is ACadSharp.Entities.MText psMtext)
+                    {
+                        drawingEntity.X = psMtext.InsertPoint.X;
+                        drawingEntity.Y = psMtext.InsertPoint.Y;
+                        drawingEntity.StyleName = psMtext.Style?.Name ?? "Standard";
+                        drawingEntity.Value = psMtext.Value;
+                    }
+                    else if (e is ACadSharp.Entities.Line psLine)
+                    {
+                        drawingEntity.X = psLine.StartPoint.X;
+                        drawingEntity.Y = psLine.StartPoint.Y;
+                    }
+                    else if (e is ACadSharp.Entities.Circle psCircle)
+                    {
+                        drawingEntity.X = psCircle.Center.X;
+                        drawingEntity.Y = psCircle.Center.Y;
+                    }
+                    else if (e is ACadSharp.Entities.Point psPoint)
+                    {
+                        drawingEntity.X = psPoint.Location.X;
+                        drawingEntity.Y = psPoint.Location.Y;
+                    }
+                    else if (e is ACadSharp.Entities.Arc psArc)
+                    {
+                        drawingEntity.X = psArc.Center.X;
+                        drawingEntity.Y = psArc.Center.Y;
+                    }
+                    else if (e is ACadSharp.Entities.LwPolyline psPoly && psPoly.Vertices.Any())
+                    {
+                        drawingEntity.X = psPoly.Vertices.First().Location.X;
+                        drawingEntity.Y = psPoly.Vertices.First().Location.Y;
+                    }
+                    else if (e is ACadSharp.Entities.Insert psInsert)
+                    {
+                        drawingEntity.X = psInsert.InsertPoint.X;
+                        drawingEntity.Y = psInsert.InsertPoint.Y;
+
+                        // Check attributes inside the block for text styles
+                        foreach (var attr in psInsert.Attributes)
+                        {
+                            // Skip empty attribute placeholders
+                            if (string.IsNullOrWhiteSpace(attr.Value)) continue;
+
+                            drawingEntities.Add(new Domain.Models.DrawingEntity
+                            {
+                                LayerName = attr.Layer?.Name ?? "0",
+                                EntityType = "ATTRIBUTE",
+                                StyleName = attr.Style?.Name ?? "Standard",
+                                Value = attr.Value,
+                                X = attr.InsertPoint.X,
+                                Y = attr.InsertPoint.Y,
+                                Space = spaceName
+                            });
+                        }
+                    }
+
+                    drawingEntities.Add(drawingEntity);
+                }
             }
 
             // Also scan all block DEFINITIONS (not instances) for text entities.
