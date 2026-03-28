@@ -24,103 +24,109 @@ namespace QCValidator.Application.Services
 
         public string Run(string fileName)
         {
-            var errors = new List<QCError>();
+            var consolidatedErrors = new Dictionary<string, QCError>();
 
-            // 1. Get data from providers
-            var currentLayers = _drawingProvider.GetLayers();
-            var templateLayers = _templateProvider.GetTemplateLayers();
-
-            // 2. Compare Layers
-            foreach (var templateLayer in templateLayers)
-            {
-                var existingLayer = currentLayers.FirstOrDefault(l => 
-                    l.Name.Equals(templateLayer.Name, StringComparison.OrdinalIgnoreCase));
-
-                if (existingLayer == null)
-                {
-                    errors.Add(new QCError(
-                        "Layer",
-                        templateLayer.Name,
-                        $"Layer '{templateLayer.Name}' is missing from the drawing."
-                    ));
-                }
-                else if (existingLayer.Color != templateLayer.Color)
-                {
-                    errors.Add(new QCError(
-                        "Layer Color",
-                        existingLayer.Name,
-                        $"Layer '{existingLayer.Name}' has color {existingLayer.Color}, but template requires {templateLayer.Color}."
-                    ));
-                }
-            }
-
-            // 2.2 Validate Text Styles (Only allowed styles)
-            var currentTextStyles = _drawingProvider.GetTextStyles();
             var allowedTextStyles = _templateProvider.GetTemplateTextStyles();
-            bool textStylesClean = true;
+            var allowedStyleNames = new HashSet<string>(
+                allowedTextStyles.Select(s => s.Name.ToUpperInvariant())
+            );
 
-
-            // 3. Check for entities on Layer 0
+            // ─────────────────────────────────────────────────────────
+            // Rule 1: Layer 0 – scan entities in model/paper space
+            // ─────────────────────────────────────────────────────────
             var entities = _drawingProvider.GetEntities();
-            bool layer0Found = false;
             foreach (var entity in entities)
             {
-                // Layer 0 Check
-                if (entity.LayerName == "0")
+                string entityTypeUpper = entity.EntityType?.ToUpperInvariant() ?? "";
+                bool isTextOrAttr = entityTypeUpper.Contains("TEXT") || entityTypeUpper.Contains("ATTRIBUTE");
+                bool hasContent = !string.IsNullOrWhiteSpace(entity.Value);
+
+                // For text/attributes: only flag if they have visible content.
+                // For graphics (lines, circles, etc.): always flag.
+                if (entity.LayerName == "0" && (!isTextOrAttr || hasContent))
                 {
-                    layer0Found = true;
-                    errors.Add(new QCError(
-                        "Layer Rule",
-                        "Layer 0",
-                        $"Entity of type '{entity.EntityType}' exists on Layer 0.",
-                        "Warning",
-                        entity.X,
-                        entity.Y,
-                        entity.Space
-                    ));
-                }
-
-                // Text Style Usage Check (Providing location)
-                bool isText = entity.EntityType.Equals("TEXT", StringComparison.OrdinalIgnoreCase) || 
-                              entity.EntityType.Equals("MTEXT", StringComparison.OrdinalIgnoreCase) ||
-                              entity.EntityType.Equals("AcDbText", StringComparison.OrdinalIgnoreCase) ||
-                              entity.EntityType.Equals("AcDbMText", StringComparison.OrdinalIgnoreCase);
-
-                if (isText && !string.IsNullOrEmpty(entity.StyleName))
-                {
-                    bool isStyleAllowed = allowedTextStyles.Any(a => 
-                        a.Name.Equals(entity.StyleName, StringComparison.OrdinalIgnoreCase));
-
-                    if (!isStyleAllowed)
+                    const string key = "LAYER_0_ERROR";
+                    if (!consolidatedErrors.ContainsKey(key))
                     {
-                        textStylesClean = false;
-                        errors.Add(new QCError(
-                            "Text Style Usage",
-                            entity.StyleName,
-                            $"Text entity uses non-compliant style '{entity.StyleName}'.",
-                            "Error",
-                            entity.X,
-                            entity.Y,
-                            entity.Space
-                        ));
+                        consolidatedErrors[key] = new QCError(
+                            "Layer 0 Rule",
+                            "Entities found on Layer 0. No entities should exist on Layer 0. Use the LAS command to validate layer state.",
+                            "Warning"
+                        );
                     }
+                    string displayContent = hasContent ? entity.Value : $"[{entity.EntityType}]";
+                    consolidatedErrors[key].AddLocation(entity.X, entity.Y, entity.Space, displayContent, "");
                 }
             }
 
-            // Generate Summary
-            string summary = "";
-            summary += layer0Found 
-                ? "Warning: Layer 0 entities detected. " 
-                : "No Layer 0 entities found. ";
-            
-            summary += textStylesClean 
-                ? "All text styles are compliant." 
-                : "Non-compliant text styles found.";
+            // ─────────────────────────────────────────────────────────
+            // Rule 2: Text Style – check the DRAWING'S STYLE TABLE.
+            // This is reliable and catches styles defined anywhere in
+            // the DWG (including inside block definitions).
+            // ─────────────────────────────────────────────────────────
+            var drawingTextStyles = _drawingProvider.GetTextStyles();
+            foreach (var style in drawingTextStyles)
+            {
+                if (string.IsNullOrEmpty(style.Name)) continue;
+                if (allowedStyleNames.Contains(style.Name.ToUpperInvariant())) continue;
 
-            // 4. Create Report
-            var report = new QCReport(fileName, DateTime.Now, summary, errors);
+                string key = $"STYLE_ERROR_{style.Name.ToUpperInvariant()}";
+                if (consolidatedErrors.ContainsKey(key)) continue;
 
-            // 4. Generate Output
+                // Build a meaningful list of where this style is actually used
+                // by scanning entities. If not found, still report the style error.
+                var styleUsages = entities
+                    .Where(e =>
+                    {
+                        string t = e.EntityType?.ToUpperInvariant() ?? "";
+                        bool isTxt = t.Contains("TEXT") || t.Contains("ATTRIBUTE");
+                        return isTxt && string.Equals(e.StyleName, style.Name, StringComparison.OrdinalIgnoreCase);
+                    })
+                    .ToList();
+
+                var err = new QCError(
+                    "Text Style Rule",
+                    $"Non-compliant text style '{style.Name}' is used in this drawing. Only 'Arial', 'Arial Narrow', or 'Standard' are permitted.",
+                    "Error"
+                );
+
+                if (styleUsages.Any())
+                {
+                    foreach (var e in styleUsages)
+                    {
+                        bool hasContent = !string.IsNullOrWhiteSpace(e.Value);
+                        string displayVal = hasContent ? e.Value : $"[{e.EntityType} – empty]";
+                        err.AddLocation(e.X, e.Y, e.Space, displayVal, e.StyleName);
+                    }
+                }
+                else
+                {
+                    // Style is in the table but no located entity – report without coordinates
+                    err.Locations.Add(new QCLocation
+                    {
+                        X = 0, Y = 0,
+                        Space = "Unknown (style defined in Style Table)",
+                        TextContent = "[No specific location found – style exists in drawing style table]",
+                        FoundStyle = style.Name
+                    });
+                }
+
+                consolidatedErrors[key] = err;
+            }
+
+            // ─────────────────────────────────────────────────────────
+            // Summary
+            // ─────────────────────────────────────────────────────────
+            int layer0Count = consolidatedErrors.Values
+                .FirstOrDefault(e => e.Category == "Layer 0 Rule")?.Locations.Count ?? 0;
+            int styleErrorCount = consolidatedErrors.Values
+                .Where(e => e.Category == "Text Style Rule").Sum(e => e.Locations.Count);
+
+            string summary = (layer0Count == 0 && styleErrorCount == 0)
+                ? "✅ Drawing is fully compliant. No Layer 0 or Text Style issues found."
+                : $"⚠️ Found {layer0Count} entity(s) on Layer 0 and {styleErrorCount} text style violation(s).";
+
+            var report = new QCReport(fileName, DateTime.Now, summary, consolidatedErrors.Values.ToList());
             return _reportGenerator.Generate(report);
         }
     }

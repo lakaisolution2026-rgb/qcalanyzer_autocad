@@ -80,12 +80,14 @@ namespace QCValidator.Infrastructure.Providers
                     drawingEntity.X = text.InsertPoint.X;
                     drawingEntity.Y = text.InsertPoint.Y;
                     drawingEntity.StyleName = text.Style?.Name ?? "Standard";
+                    drawingEntity.Value = text.Value;
                 }
                 else if (e is ACadSharp.Entities.MText mtext)
                 {
                     drawingEntity.X = mtext.InsertPoint.X;
                     drawingEntity.Y = mtext.InsertPoint.Y;
                     drawingEntity.StyleName = mtext.Style?.Name ?? "Standard";
+                    drawingEntity.Value = mtext.Value;
                 }
                 else if (e is ACadSharp.Entities.Line line)
                 {
@@ -116,12 +118,95 @@ namespace QCValidator.Infrastructure.Providers
                 {
                     drawingEntity.X = insert.InsertPoint.X;
                     drawingEntity.Y = insert.InsertPoint.Y;
+                    
+                    // Check attributes inside the block for text styles
+                    foreach(var attr in insert.Attributes)
+                    {
+                        drawingEntities.Add(new Domain.Models.DrawingEntity
+                        {
+                            LayerName = attr.Layer.Name,
+                            EntityType = "ATTRIBUTE",
+                            StyleName = attr.Style?.Name ?? "Standard",
+                            Value = attr.Value,
+                            X = attr.InsertPoint.X,
+                            Y = attr.InsertPoint.Y,
+                            Space = drawingEntity.Space
+                        });
+                    }
                 }
 
                 drawingEntities.Add(drawingEntity);
             }
 
+            // Also scan all block DEFINITIONS (not instances) for text entities.
+            // This finds text with wrong styles that live inside symbol blocks.
+            // Coordinates are local to the block; Space is labeled "Block: <name>".
+            foreach (var blockRecord in _document.BlockRecords)
+            {
+                // Skip the auto-generated model/paper space blocks (already covered above)
+                if (blockRecord.Name.StartsWith("*")) continue;
+
+                foreach (var e in blockRecord.Entities)
+                {
+                    ExtractTextFromEntity(e, $"Block: {blockRecord.Name}", drawingEntities);
+
+                    // Also check attributes defined inside block definitions
+                    if (e is ACadSharp.Entities.Insert nestedInsert)
+                    {
+                        foreach (var attr in nestedInsert.Attributes)
+                        {
+                            if (!string.IsNullOrWhiteSpace(attr.Value))
+                            {
+                                drawingEntities.Add(new Domain.Models.DrawingEntity
+                                {
+                                    LayerName = attr.Layer?.Name ?? "0",
+                                    EntityType = "ATTRIBUTE",
+                                    StyleName = attr.Style?.Name ?? "Standard",
+                                    Value = attr.Value,
+                                    X = attr.InsertPoint.X,
+                                    Y = attr.InsertPoint.Y,
+                                    Space = $"Block: {blockRecord.Name}"
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
             return drawingEntities;
+        }
+
+        private void ExtractTextFromEntity(
+            ACadSharp.Entities.Entity e,
+            string space,
+            List<Domain.Models.DrawingEntity> drawingEntities)
+        {
+            if (e is ACadSharp.Entities.TextEntity text && !string.IsNullOrWhiteSpace(text.Value))
+            {
+                drawingEntities.Add(new Domain.Models.DrawingEntity
+                {
+                    LayerName = e.Layer?.Name ?? "0",
+                    EntityType = "TEXT",
+                    StyleName = text.Style?.Name ?? "Standard",
+                    Value = text.Value,
+                    X = text.InsertPoint.X,
+                    Y = text.InsertPoint.Y,
+                    Space = space
+                });
+            }
+            else if (e is ACadSharp.Entities.MText mtext && !string.IsNullOrWhiteSpace(mtext.Value))
+            {
+                drawingEntities.Add(new Domain.Models.DrawingEntity
+                {
+                    LayerName = e.Layer?.Name ?? "0",
+                    EntityType = "MTEXT",
+                    StyleName = mtext.Style?.Name ?? "Standard",
+                    Value = mtext.Value,
+                    X = mtext.InsertPoint.X,
+                    Y = mtext.InsertPoint.Y,
+                    Space = space
+                });
+            }
         }
     }
 }

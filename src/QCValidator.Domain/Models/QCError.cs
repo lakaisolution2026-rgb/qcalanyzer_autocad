@@ -1,26 +1,51 @@
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
+
 namespace QCValidator.Domain.Models
 {
-    public class QCError
+    public class QCLocation
     {
-        public string Category { get; set; } = string.Empty;
-        public string Item { get; set; } = string.Empty;
-        public string Message { get; set; } = string.Empty;
-        public string Severity { get; set; } = "Error";
-        public double? X { get; set; }
-        public double? Y { get; set; }
+        public double X { get; set; }
+        public double Y { get; set; }
         public string Space { get; set; } = string.Empty;
+        public string TextContent { get; set; } = string.Empty; // Actual text found there
+        public string FoundStyle { get; set; } = string.Empty; // Style name found there
 
-        public QCError() { }
-
-        public QCError(string category, string item, string message, string severity = "Error", double? x = null, double? y = null, string space = "")
+        public QCLocation() { }
+        public QCLocation(double x, double y, string space, string textContent = "", string foundStyle = "")
         {
-            Category = category;
-            Item = item;
-            Message = message;
-            Severity = severity;
             X = x;
             Y = y;
             Space = space;
+            TextContent = textContent;
+            FoundStyle = foundStyle;
+        }
+    }
+
+    public class QCError
+    {
+        public string Category { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string Severity { get; set; } = "Error";
+        public List<QCLocation> Locations { get; set; } = new List<QCLocation>();
+        [JsonIgnore]
+        public int Count => Locations.Count;
+
+        public QCError() { }
+
+        public QCError(string category, string message, string severity = "Error")
+        {
+            Category = category;
+            Message = message;
+            Severity = severity;
+        }
+
+        public void AddLocation(double? x, double? y, string space, string textContent = "", string foundStyle = "")
+        {
+            if (x.HasValue && y.HasValue)
+            {
+                Locations.Add(new QCLocation(x.Value, y.Value, space, textContent, foundStyle));
+            }
         }
     }
 }

@@ -71,3 +71,6 @@ The project is structured into four distinct layers, following Clean Architectur
    dotnet run --project src/QCValidator.Console/QCValidator.Console.csproj <path-to-your-drawing.dwg>
    ```
 4. Check the generated `qc_report.json` for validation results.
+
+to runt he project :
+dotnet run --project "src/QCValidator.WebUI/QCValidator.WebUI.csproj"
