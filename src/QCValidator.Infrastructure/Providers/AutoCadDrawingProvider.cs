@@ -150,10 +150,11 @@ namespace QCValidator.Infrastructure.Providers
                 if (!blockRecord.Name.StartsWith("*Paper_Space", System.StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                // Build a friendly space label
-                string spaceName = blockRecord.Name.Equals("*Paper_Space", System.StringComparison.OrdinalIgnoreCase)
-                    ? "PaperSpace"
-                    : $"PaperSpace ({blockRecord.Name.Replace("*Paper_Space", "Layout")})";
+                // Get the actual layout/sheet name (the tab name visible in AutoCAD)
+                string? layoutName = blockRecord.Layout?.Name;
+                string spaceName = !string.IsNullOrWhiteSpace(layoutName)
+                    ? $"PaperSpace – {layoutName}"
+                    : "PaperSpace";
 
                 foreach (var e in blockRecord.Entities)
                 {
