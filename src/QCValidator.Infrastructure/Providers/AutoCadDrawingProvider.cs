@@ -113,6 +113,25 @@ namespace QCValidator.Infrastructure.Providers
                 {
                     drawingEntity.X = polyline.Vertices.First().Location.X;
                     drawingEntity.Y = polyline.Vertices.First().Location.Y;
+
+                    // Calculate bounding box for box/rectangle detection
+                    var verts = polyline.Vertices.ToList();
+                    if (verts.Count >= 3)
+                    {
+                        var xs = verts.Select(v => v.Location.X);
+                        var ys = verts.Select(v => v.Location.Y);
+                        drawingEntity.BoundsMinX = xs.Min();
+                        drawingEntity.BoundsMinY = ys.Min();
+                        drawingEntity.BoundsMaxX = xs.Max();
+                        drawingEntity.BoundsMaxY = ys.Max();
+
+                        // Detect closed polyline via flag or matching first/last vertex
+                        bool flagClosed = polyline.IsClosed;
+                        double dx = verts.First().Location.X - verts.Last().Location.X;
+                        double dy = verts.First().Location.Y - verts.Last().Location.Y;
+                        bool vertexClosed = System.Math.Sqrt(dx * dx + dy * dy) < 0.1;
+                        drawingEntity.IsClosed = flagClosed || vertexClosed;
+                    }
                 }
                 else if (e is ACadSharp.Entities.Insert insert)
                 {
@@ -158,11 +177,29 @@ namespace QCValidator.Infrastructure.Providers
 
                 foreach (var e in blockRecord.Entities)
                 {
-                    // Skip Viewport entities – every Paper Space layout has a
-                    // system-generated default viewport on Layer 0. These are
-                    // not user errors and should not be flagged.
-                    if (e is ACadSharp.Entities.Viewport)
+                    // Extract Viewport entities with their bounds (for boxed-callout zone detection)
+                    // but mark them so they don't trigger Layer 0 or other rules.
+                    if (e is ACadSharp.Entities.Viewport vp)
+                    {
+                        // Skip the system default viewport (viewport #1, or zero-size)
+                        if (vp.Width <= 0 || vp.Height <= 0)
+                            continue;
+
+                        drawingEntities.Add(new Domain.Models.DrawingEntity
+                        {
+                            LayerName = vp.Layer?.Name ?? "VIEWPORTS",
+                            EntityType = "VIEWPORT",
+                            Space = spaceName,
+                            X = vp.Center.X,
+                            Y = vp.Center.Y,
+                            BoundsMinX = vp.Center.X - (vp.Width / 2.0),
+                            BoundsMinY = vp.Center.Y - (vp.Height / 2.0),
+                            BoundsMaxX = vp.Center.X + (vp.Width / 2.0),
+                            BoundsMaxY = vp.Center.Y + (vp.Height / 2.0),
+                            IsClosed = true
+                        });
                         continue;
+                    }
 
                     var drawingEntity = new Domain.Models.DrawingEntity
                     {
@@ -209,11 +246,30 @@ namespace QCValidator.Infrastructure.Providers
                     {
                         drawingEntity.X = psPoly.Vertices.First().Location.X;
                         drawingEntity.Y = psPoly.Vertices.First().Location.Y;
+
+                        // Calculate bounding box for box/rectangle detection
+                        var psVerts = psPoly.Vertices.ToList();
+                        if (psVerts.Count >= 3)
+                        {
+                            var psXs = psVerts.Select(v => v.Location.X);
+                            var psYs = psVerts.Select(v => v.Location.Y);
+                            drawingEntity.BoundsMinX = psXs.Min();
+                            drawingEntity.BoundsMinY = psYs.Min();
+                            drawingEntity.BoundsMaxX = psXs.Max();
+                            drawingEntity.BoundsMaxY = psYs.Max();
+
+                            bool psFlagClosed = psPoly.IsClosed;
+                            double psDx = psVerts.First().Location.X - psVerts.Last().Location.X;
+                            double psDy = psVerts.First().Location.Y - psVerts.Last().Location.Y;
+                            bool psVertexClosed = System.Math.Sqrt(psDx * psDx + psDy * psDy) < 0.1;
+                            drawingEntity.IsClosed = psFlagClosed || psVertexClosed;
+                        }
                     }
                     else if (e is ACadSharp.Entities.Insert psInsert)
                     {
                         drawingEntity.X = psInsert.InsertPoint.X;
                         drawingEntity.Y = psInsert.InsertPoint.Y;
+                        drawingEntity.IsInsideBlock = true; // The INSERT itself is a block
 
                         // Check attributes inside the block for text styles
                         foreach (var attr in psInsert.Attributes)
@@ -229,7 +285,8 @@ namespace QCValidator.Infrastructure.Providers
                                 Value = attr.Value,
                                 X = attr.InsertPoint.X,
                                 Y = attr.InsertPoint.Y,
-                                Space = spaceName
+                                Space = spaceName,
+                                IsInsideBlock = true // Mark as from a block (e.g., title block)
                             });
                         }
                     }

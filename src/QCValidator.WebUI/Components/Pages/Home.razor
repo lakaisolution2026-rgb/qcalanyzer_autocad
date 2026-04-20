@@ -14,7 +14,7 @@
 <div class="dashboard-container">
     <div class="premium-card animate-fade-in">
         <h1 class="vibrant-header">Drawing Health Check</h1>
-        <p class="subtitle">Ensuring AutoCAD standard compliance (2 Essential Rules).</p>
+        <p class="subtitle">Ensuring AutoCAD standard compliance (4 Essential Rules).</p>
 
         <label for="fileInput" class="upload-zone">
             <span style="font-size: 3rem; color: var(--primary);">📁</span>
@@ -47,13 +47,15 @@
                 {
                     <div class="premium-card" style="text-align: center; background: rgba(16, 185, 129, 0.05);">
                         <span style="font-size: 2rem; color: var(--success);">🏆</span>
-                        <h3 style="color: var(--success);">All checks passed! No Layer 0 or Text Style issues found.</h3>
+                        <h3 style="color: var(--success);">All checks passed! No Layer 0, Text Style, Callout Text, or Boxed Callout issues found.</h3>
                     </div>
                 }
                 else
                 {
                     var layer0Errors = report.Errors.Where(e => e.Category == "Layer 0 Rule").ToList();
                     var styleErrors  = report.Errors.Where(e => e.Category == "Text Style Rule").ToList();
+                    var calloutErrors = report.Errors.Where(e => e.Category == "PaperSpace Callout Text Rule").ToList();
+                    var boxedErrors = report.Errors.Where(e => e.Category == "PaperSpace Boxed Callout Rule").ToList();
 
                     @* ── Layer 0 Card ── *@
                     @if (layer0Errors.Any())
@@ -142,6 +144,150 @@
                                     </div>
                                 </details>
                             }
+                        </div>
+                    }
+
+                    @* ── PaperSpace Callout Text Card (ALWAYS shown) ── *@
+                    @if (calloutErrors.Any())
+                    {
+                        var ct = calloutErrors.First();
+                        bool hasViolations = ct.Locations.Count > 0;
+                        string borderColor = hasViolations ? "var(--error)" : "var(--success)";
+                        
+                        <div class="premium-card animate-fade-in" style="margin-bottom: 1.5rem; border-left: 4px solid @(borderColor);">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    @if (hasViolations)
+                                    {
+                                        <span class="badge badge-error">Error</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--success);">Passed</span>
+                                    }
+                                    <strong style="margin-left: 0.5rem; color: var(--text-primary);">PaperSpace Callout Text Rule</strong>
+                                    <p style="color: var(--text-secondary); margin: 0.5rem 0;">@(ct.Message)</p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span style="font-size: 1.5rem; font-weight: 800; color: @(hasViolations ? "var(--error)" : "var(--success)");">@(ct.Locations.Count)</span>
+                                    <span style="color: var(--text-secondary); display: block;">Callout Violations</span>
+                                </div>
+                            </div>
+                            <details style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+                                <summary style="cursor: pointer; color: @(hasViolations ? "var(--error)" : "var(--accent)"); font-weight: 600;">
+                                    @if (hasViolations)
+                                    {
+                                        <text>📌 View all @(ct.Locations.Count) violation(s) &amp; AutoCAD Zoom commands</text>
+                                    }
+                                    else
+                                    {
+                                        <text>✅ All Paper Space callout text checked — no forbidden words found</text>
+                                    }
+                                </summary>
+                                @if (hasViolations)
+                                {
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                                        @foreach (var loc in ct.Locations)
+                                        {
+                                            <div style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 0.75rem; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem;">
+                                                <div style="display: flex; justify-content: space-between; align-items: start;">
+                                                    <div>
+                                                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">@(loc.Space)</div>
+                                                        <div class="coordinate">@(Math.Round(loc.X, 2)), @(Math.Round(loc.Y, 2))</div>
+                                                    </div>
+                                                    <button class="copy-btn" @onclick="() => CopyZoomCommand(loc.X, loc.Y)">Copy Zoom</button>
+                                                </div>
+                                                <div style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 0.4rem; border-left: 3px solid var(--error);">
+                                                    <div style="font-size: 0.7rem; color: var(--text-secondary);">Callout Text Content:</div>
+                                                    <div style="font-weight: 600; font-family: 'JetBrains Mono'; font-size: 0.9rem;">@(loc.TextContent)</div>
+                                                    <div style="font-size: 0.7rem; color: var(--error); margin-top: 0.4rem;">
+                                                        Contains forbidden word(s) — must be removed
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div style="padding: 1.5rem; text-align: center; margin-top: 1rem;">
+                                        <span style="font-size: 2rem;">🛡️</span>
+                                        <p style="color: var(--success); font-weight: 600; margin-top: 0.5rem;">All Paper Space text entities are compliant. No 'PROPOSED' or 'TO BE INSTALLED' text detected.</p>
+                                    </div>
+                                }
+                            </details>
+                        </div>
+                    }
+
+                    @* ── PaperSpace Boxed Callout Card (ALWAYS shown) ── *@
+                    @if (boxedErrors.Any())
+                    {
+                        var bx = boxedErrors.First();
+                        bool hasBoxedViolations = bx.Locations.Count > 0;
+                        string boxBorderColor = hasBoxedViolations ? "var(--error)" : "var(--success)";
+
+                        <div class="premium-card animate-fade-in" style="margin-bottom: 1.5rem; border-left: 4px solid @(boxBorderColor);">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    @if (hasBoxedViolations)
+                                    {
+                                        <span class="badge badge-error">Error</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--success);">Passed</span>
+                                    }
+                                    <strong style="margin-left: 0.5rem; color: var(--text-primary);">PaperSpace Boxed Callout Rule</strong>
+                                    <p style="color: var(--text-secondary); margin: 0.5rem 0;">@(bx.Message)</p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span style="font-size: 1.5rem; font-weight: 800; color: @(hasBoxedViolations ? "var(--error)" : "var(--success)");">@(bx.Locations.Count)</span>
+                                    <span style="color: var(--text-secondary); display: block;">Boxed Text Found</span>
+                                </div>
+                            </div>
+                            <details style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+                                <summary style="cursor: pointer; color: @(hasBoxedViolations ? "var(--error)" : "var(--accent)"); font-weight: 600;">
+                                    @if (hasBoxedViolations)
+                                    {
+                                        <text>📦 View all @(bx.Locations.Count) boxed callout(s) &amp; AutoCAD Zoom commands</text>
+                                    }
+                                    else
+                                    {
+                                        <text>✅ No callout text covered by rectangles/boxes detected</text>
+                                    }
+                                </summary>
+                                @if (hasBoxedViolations)
+                                {
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                                        @foreach (var loc in bx.Locations)
+                                        {
+                                            <div style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 0.75rem; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem;">
+                                                <div style="display: flex; justify-content: space-between; align-items: start;">
+                                                    <div>
+                                                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">@(loc.Space)</div>
+                                                        <div class="coordinate">@(Math.Round(loc.X, 2)), @(Math.Round(loc.Y, 2))</div>
+                                                    </div>
+                                                    <button class="copy-btn" @onclick="() => CopyZoomCommand(loc.X, loc.Y)">Copy Zoom</button>
+                                                </div>
+                                                <div style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 0.4rem; border-left: 3px solid var(--error);">
+                                                    <div style="font-size: 0.7rem; color: var(--text-secondary);">Boxed Callout Text:</div>
+                                                    <div style="font-weight: 600; font-family: 'JetBrains Mono'; font-size: 0.9rem;">@(loc.TextContent)</div>
+                                                    <div style="font-size: 0.7rem; color: var(--error); margin-top: 0.4rem;">
+                                                        Text is covered by a rectangle/box — must be reviewed
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div style="padding: 1.5rem; text-align: center; margin-top: 1rem;">
+                                        <span style="font-size: 2rem;">📦</span>
+                                        <p style="color: var(--success); font-weight: 600; margin-top: 0.5rem;">No callout text is covered by rectangles or box lines in Paper Space.</p>
+                                    </div>
+                                }
+                            </details>
                         </div>
                     }
                 }

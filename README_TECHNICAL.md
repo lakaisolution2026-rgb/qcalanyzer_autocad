@@ -74,3 +74,4 @@ The project is structured into four distinct layers, following Clean Architectur
 
 to runt he project :
 dotnet run --project "src/QCValidator.WebUI/QCValidator.WebUI.csproj"
+1qdcqb;jv;]
