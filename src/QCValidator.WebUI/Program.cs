@@ -3,6 +3,10 @@ using QCValidator.Application.Interfaces;
 using QCValidator.Application.Services;
 using QCValidator.Infrastructure.Providers;
 using QCValidator.Infrastructure.Generators;
+using QuestPDF.Infrastructure;
+
+// QuestPDF community license (free for small businesses)
+QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 

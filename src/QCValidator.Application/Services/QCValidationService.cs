@@ -237,11 +237,27 @@ namespace QCValidator.Application.Services
 
             int psRectsScannedCount = psClosedRects.Count;
 
-            // ── Filter 3: 3mm proximity check ──
+            // ── Filter 3: keyword + 3mm proximity check ──
+            // Only flag boxed text that contains forbidden keywords
+            string[] boxedKeywords = { "INSTALLED", "PROPOSED", "TO BE INSTALLED" };
             double proximity = 3.0; // 3mm — rectangle must be within 3mm of the text
 
             foreach (var textEntity in directPsText)
             {
+                // Only check text containing forbidden keywords (case-insensitive)
+                string textUpper = textEntity.Value?.ToUpperInvariant() ?? "";
+                bool containsForbidden = false;
+                foreach (var kw in boxedKeywords)
+                {
+                    if (textUpper.Contains(kw))
+                    {
+                        containsForbidden = true;
+                        break;
+                    }
+                }
+                if (!containsForbidden)
+                    continue; // Text does NOT contain any forbidden keyword — skip
+
                 // Check text is over the viewport area
                 if (layoutViewportZones.TryGetValue(textEntity.Space, out var vpZone))
                 {
@@ -279,14 +295,13 @@ namespace QCValidator.Application.Services
                         {
                             consolidatedErrors[boxedKey] = new QCError(
                                 "PaperSpace Boxed Callout Rule",
-                                $"Callout text over the viewport area is covered by a rectangle/box (within 3mm proximity). " +
-                                $"Checked {directPsTextCount} direct callout(s) against {psRectsScannedCount} rectangle(s) in {psViewportCount} viewport zone(s). " +
+                                $"Callout text containing 'INSTALLED'/'PROPOSED'/'TO BE INSTALLED' over the viewport area is covered by a rectangle/box (within 3mm). " +
                                 $"Block/template text is excluded.",
                                 "Error"
                             );
                         }
                         consolidatedErrors[boxedKey].AddLocation(
-                            textEntity.X, textEntity.Y, textEntity.Space, textEntity.Value, textEntity.StyleName);
+                            textEntity.X, textEntity.Y, textEntity.Space, textEntity.Value ?? "", textEntity.StyleName);
                         break;
                     }
                 }
@@ -297,8 +312,8 @@ namespace QCValidator.Application.Services
             {
                 consolidatedErrors[boxedKey] = new QCError(
                     "PaperSpace Boxed Callout Rule",
-                    $"Scanned {directPsTextCount} direct callout(s) against {psRectsScannedCount} rectangle(s) in {psViewportCount} viewport zone(s). " +
-                    $"Block/template text excluded. No boxed callout text detected (3mm proximity).",
+                    $"Scanned {directPsTextCount} direct callout(s) for keywords ('INSTALLED'/'PROPOSED'/'TO BE INSTALLED') against {psRectsScannedCount} rectangle(s) in {psViewportCount} viewport zone(s). " +
+                    $"No boxed forbidden-keyword callout text detected (3mm proximity).",
                     "Info"
                 );
             }

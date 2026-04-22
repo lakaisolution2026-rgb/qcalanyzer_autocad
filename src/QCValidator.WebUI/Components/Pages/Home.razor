@@ -7,6 +7,9 @@
 @using System.Text.Json
 @using Microsoft.AspNetCore.Components.Forms
 @using System.IO
+@using QuestPDF.Fluent
+@using QuestPDF.Helpers
+@using QuestPDF.Infrastructure
 @inject ITemplateProvider TemplateProvider
 @inject IReportGenerator ReportGenerator
 @inject IJSRuntime JSRuntime
@@ -41,7 +44,12 @@
                     </div>
                 </div>
 
-                <div class="vibrant-header" style="font-size: 1.5rem; margin-top: 2rem;">Consolidated Errors</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; flex-wrap: wrap; gap: 1rem;">
+                    <div class="vibrant-header" style="font-size: 1.5rem; margin: 0;">Consolidated Errors</div>
+                    <button class="copy-btn" style="background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; padding: 0.6rem 1.5rem; font-size: 0.9rem; border-radius: 0.5rem; cursor: pointer; border: none; font-weight: 600;" @onclick="DownloadPdfReport">
+                        📄 Download PDF Report
+                    </button>
+                </div>
                 
                 @if (report.Errors.Count == 0)
                 {
@@ -398,5 +406,164 @@
     private async Task CopyJsonToClipboard()
     {
         await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", rawJson);
+    }
+
+    private async Task DownloadPdfReport()
+    {
+        if (report == null) return;
+
+        var pdfBytes = GeneratePdf(report);
+        var base64 = Convert.ToBase64String(pdfBytes);
+        var fileName = $"QC_Report_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+
+        await JSRuntime.InvokeVoidAsync("eval", $@"
+            (function() {{
+                var byteString = atob('{base64}');
+                var ab = new ArrayBuffer(byteString.length);
+                var ia = new Uint8Array(ab);
+                for (var i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+                var blob = new Blob([ab], {{ type: 'application/pdf' }});
+                var link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = '{fileName}';
+                link.click();
+                URL.revokeObjectURL(link.href);
+            }})()
+        ");
+    }
+
+    private byte[] GeneratePdf(QCReport rpt)
+    {
+        var document = QuestPDF.Fluent.Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(30);
+                page.DefaultTextStyle(x => x.FontSize(9).FontColor(Colors.Grey.Darken3));
+
+                // ── Header ──
+                page.Header().Column(col =>
+                {
+                    col.Item().Background(Colors.Blue.Darken3).Padding(12).Row(row =>
+                    {
+                        row.RelativeItem().Column(c =>
+                        {
+                            c.Item().Text("QC Validator — Drawing Inspection Report")
+                                .FontSize(16).Bold().FontColor(Colors.White);
+                            c.Item().Text($"File: {rpt.FileName}")
+                                .FontSize(9).FontColor(Colors.Blue.Lighten4);
+                            c.Item().Text($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}")
+                                .FontSize(8).FontColor(Colors.Blue.Lighten4);
+                        });
+                        row.ConstantItem(60).AlignCenter().AlignMiddle().Text($"{Math.Max(0, 100 - rpt.Errors.Sum(e => e.Locations.Count) * 5)}%")
+                            .FontSize(18).Bold().FontColor(Colors.White);
+                    });
+
+                    col.Item().PaddingVertical(6).Text(rpt.Summary).FontSize(8).Italic().FontColor(Colors.Grey.Medium);
+                    col.Item().LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
+                    col.Item().PaddingBottom(8);
+                });
+
+                // ── Content ──
+                page.Content().Column(content =>
+                {
+                    foreach (var error in rpt.Errors)
+                    {
+                        bool isPass = error.Severity == "Info" || error.Locations.Count == 0;
+                        var statusColor = isPass ? Colors.Green.Darken1 : Colors.Red.Darken1;
+                        var statusBg = isPass ? Colors.Green.Lighten5 : Colors.Red.Lighten5;
+                        var statusLabel = isPass ? "PASSED" : "ERROR";
+
+                        content.Item().PaddingBottom(10).Border(1).BorderColor(Colors.Grey.Lighten2)
+                            .Column(card =>
+                        {
+                            // Rule header
+                            card.Item().Background(statusBg).Padding(8).Row(row =>
+                            {
+                                row.RelativeItem().Column(c =>
+                                {
+                                    c.Item().Row(r =>
+                                    {
+                                        r.AutoItem().Background(statusColor).Padding(2).PaddingHorizontal(6)
+                                            .Text(statusLabel).FontSize(7).Bold().FontColor(Colors.White);
+                                        r.AutoItem().PaddingLeft(6).Text(error.Category)
+                                            .FontSize(10).Bold().FontColor(Colors.Grey.Darken3);
+                                    });
+                                    c.Item().PaddingTop(3).Text(error.Message)
+                                        .FontSize(7).FontColor(Colors.Grey.Medium);
+                                });
+                                row.ConstantItem(50).AlignCenter().AlignMiddle()
+                                    .Text($"{error.Locations.Count}").FontSize(14).Bold().FontColor(statusColor);
+                            });
+
+                            // Location table (only if violations exist)
+                            if (error.Locations.Count > 0)
+                            {
+                                card.Item().Padding(6).Table(table =>
+                                {
+                                    table.ColumnsDefinition(cols =>
+                                    {
+                                        cols.ConstantColumn(25);  // #
+                                        cols.RelativeColumn(2);   // Space/Layout
+                                        cols.RelativeColumn(1.5f); // Coordinates
+                                        cols.RelativeColumn(3);   // Text Content
+                                        cols.RelativeColumn(2);   // Zoom Command
+                                    });
+
+                                    // Table header
+                                    table.Header(header =>
+                                    {
+                                        header.Cell().Background(Colors.Grey.Lighten3).Padding(3)
+                                            .Text("#").FontSize(7).Bold();
+                                        header.Cell().Background(Colors.Grey.Lighten3).Padding(3)
+                                            .Text("Space / Layout").FontSize(7).Bold();
+                                        header.Cell().Background(Colors.Grey.Lighten3).Padding(3)
+                                            .Text("Coordinates").FontSize(7).Bold();
+                                        header.Cell().Background(Colors.Grey.Lighten3).Padding(3)
+                                            .Text("Text Content").FontSize(7).Bold();
+                                        header.Cell().Background(Colors.Grey.Lighten3).Padding(3)
+                                            .Text("Zoom Command").FontSize(7).Bold();
+                                    });
+
+                                    // Table rows
+                                    int idx = 0;
+                                    foreach (var loc in error.Locations)
+                                    {
+                                        idx++;
+                                        var rowBg = idx % 2 == 0 ? Colors.Grey.Lighten5 : Colors.White;
+
+                                        table.Cell().Background(rowBg).Padding(2)
+                                            .Text($"{idx}").FontSize(7);
+                                        table.Cell().Background(rowBg).Padding(2)
+                                            .Text(loc.Space ?? "").FontSize(7);
+                                        table.Cell().Background(rowBg).Padding(2)
+                                            .Text($"{Math.Round(loc.X, 2)}, {Math.Round(loc.Y, 2)}").FontSize(7);
+                                        table.Cell().Background(rowBg).Padding(2)
+                                            .Text(string.IsNullOrEmpty(loc.TextContent) ? "—" : loc.TextContent).FontSize(7);
+                                        table.Cell().Background(rowBg).Padding(2)
+                                            .Text($"-ZOOM C {Math.Round(loc.X, 2)},{Math.Round(loc.Y, 2)} 100").FontSize(6).FontColor(Colors.Blue.Darken2);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+
+                // ── Footer ──
+                page.Footer().AlignCenter().Padding(8)
+                    .Text(t =>
+                    {
+                        t.Span("QC Validator Report — Page ").FontSize(7).FontColor(Colors.Grey.Medium);
+                        t.CurrentPageNumber().FontSize(7).FontColor(Colors.Grey.Medium);
+                        t.Span(" of ").FontSize(7).FontColor(Colors.Grey.Medium);
+                        t.TotalPages().FontSize(7).FontColor(Colors.Grey.Medium);
+                    });
+            });
+        });
+
+        using var stream = new MemoryStream();
+        document.GeneratePdf(stream);
+        return stream.ToArray();
     }
 }
